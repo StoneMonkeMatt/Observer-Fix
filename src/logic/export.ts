@@ -213,7 +213,8 @@ export function transformToCompassRunRecord(
     rawDuality: step.rawDuality,
     duality: step.duality,
     bridgeActive: (step.bridgeEvents?.length || 0) > 0,
-    highDualityPersistence: results.highDualityPersistence && results.highDualityStep === step.step
+    highDualityPersistence: results.highDualityPersistence && results.highDualityStep === step.step,
+    highDualityPersistenceDiagnostic: step.diagnostics?.highDualityPersistence
   })) : undefined;
 
   // 9. Adversarial

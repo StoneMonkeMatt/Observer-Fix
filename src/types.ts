@@ -578,6 +578,7 @@ export interface DebugTraceEntry {
   bridgeType?: string;
   highDualityCandidate?: boolean;
   highDualityPersistence?: boolean;
+  highDualityPersistenceDiagnostic?: HighDualityPersistenceDiagnostic;
   notes?: string;
 }
 
