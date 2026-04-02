@@ -66,6 +66,7 @@ export function transformToCompassRunRecord(
     temperature: params.temperature,
     maxSteps: results.iterationsRun,
     threshold: params.threshold,
+    highDualityPersistenceSteps: params.highDualityPersistenceSteps || 1,
     maxSequenceLength: params.maxSequenceLength,
     architectureMode: params.architectureMode,
     seed: results.seed || params.seed || 0,

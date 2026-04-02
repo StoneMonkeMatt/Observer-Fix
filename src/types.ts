@@ -329,6 +329,7 @@ export type ParameterKey =
   | "temperature"
   | "seed"
   | "threshold"
+  | "highDualityPersistenceSteps"
   | "maxSequenceLength"
   | "maxSteps"
   | "architectureMode";
@@ -344,6 +345,7 @@ export interface CompassParameters {
   temperature: number;
   maxSteps: number;
   threshold: number;
+  highDualityPersistenceSteps: number;
   maxSequenceLength: number;
   architectureMode: "stratified" | "flat" | string;
   seed: number | string;

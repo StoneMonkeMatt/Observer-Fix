@@ -26,7 +26,7 @@ export class Telos {
       eta: 0.3,
       epsilon: 0.05,
       threshold: 0.8,
-      observerPersistence: 2,
+      highDualityPersistenceSteps: 2,
       temperature: 1.0,
       maxSequenceLength: 10,
       architectureMode: 'stratified',
@@ -115,7 +115,7 @@ export class Telos {
   }
 
   /**
-   * Task 5: Expose score components
+   * Expose score components
    */
   public computeTelicScore(seq: string[]): {
     info: number;
@@ -133,7 +133,7 @@ export class Telos {
     const coherencePart = this.params.gamma * Phi;
     const energyPart = this.params.delta * E;
     
-    // Task 1: Strengthen complexity cost
+    // Strengthen complexity cost
     // Piecewise quadratic penalty after length 10
     const penalizedK = K <= 10 ? K : 10 + Math.pow(K - 10, 2);
     const complexityPart = -this.params.beta * penalizedK;
@@ -190,7 +190,7 @@ export class Telos {
   }
 
   /**
-   * Task 1: Fix duality definition
+   * Fix duality definition
    * A single raw duality measure calculated directly from the sequence.
    * Interpretable as "current sequence duality/coherence/tension level".
    * Bounded in [0, 1].
@@ -269,32 +269,30 @@ export class Telos {
   }
 
   /**
-   * Compound structural trigger for observer emergence.
+   * Compound structural trigger for high duality persistence.
    * Evaluates a multi-signal state using existing engine metrics.
    */
-  private checkObserverEmergence(
+  private checkHighDualityPersistence(
     currentSeq: string[],
-    currentStep: number,
     dNew: number,
-    metrics: any,
-    history: SimulationStep[]
+    metrics: Partial<SimulationStep>
   ): boolean {
-    // 1. Invariant Integrity: Ensure no kernel leakage (invariantLeakageFlag)
+    // 1. Invariant Integrity: Reject if kernel purity drops below safety threshold (0.3)
     if (metrics.invariantLeakageFlag) return false;
 
-    // 2. Symbolic Capacity: Minimum sequence length for high-capacity runs
-    if (currentSeq.length < 30) return false;
+    // 2. Symbolic Capacity: Require minimum sequence length for structural complexity
+    if (currentSeq.length < 8) return false;
 
-    // 3. Telic Tension: Smoothed duality (dNew) must cross the configured threshold
+    // 3. Telic Tension: Smoothed duality must exceed the parameter-defined threshold
     if (dNew < this.params.threshold) return false;
 
-    // 4. Bridge Richness: Nontrivial cross-domain integration (bridgeActivationRate)
-    if (metrics.bridgeActivationRate < 0.15) return false;
+    // 4. Bridge Richness: Require minimum cross-domain integration density (15%)
+    if (metrics.bridgeActivationRate !== undefined && metrics.bridgeActivationRate < 0.15) return false;
 
-    // 5. Structural Alignment: High consensusScore (quality/alignment proxy)
-    if (metrics.consensusScore < 0.6) return false;
+    // 5. Structural Alignment: Require high consensus score (telic quality proxy)
+    if (metrics.consensusScore !== undefined && metrics.consensusScore < 50) return false;
 
-    // 6. Symbolic Presence: Persistent observer-like monitoring patterns (👁️/🧠)
+    // 6. Symbolic Presence: Require presence of at least two observer-class symbols (👁️/🧠)
     const observerSymbols = currentSeq.filter(s => s === '👁️' || s === '🧠').length;
     if (observerSymbols < 2) return false;
 
@@ -351,7 +349,7 @@ export class Telos {
   /**
    * [ORCHESTRATION / SIMULATION LOOP]
    */
-  public evolveStep(seq: string[], step: number, dHist: number[], currentTemp: number, prevSmoothedDuality: number, prevStep?: SimulationStep): { 
+  public evolveStep(seq: string[], step: number, currentTemp: number, prevSmoothedDuality: number, prevStep?: SimulationStep): { 
     nextSeq: string[], 
     dNew: number, 
     rawD: number,
@@ -361,7 +359,13 @@ export class Telos {
     deltaScore: number,
     inventoryChanged: boolean,
     orderChanged: boolean,
-    scoreBreakdown: any,
+    scoreBreakdown: {
+      info: number;
+      coherence: number;
+      energy: number;
+      complexityPenalty: number;
+      total: number;
+    },
     selectionMetadata: SimulationStep['selectionMetadata'],
     diagnostics: SimulationStep['diagnostics'],
     metrics: Partial<SimulationStep>
@@ -526,7 +530,7 @@ export class Telos {
     const initialRawD = this.computeRawDuality(current);
     const initialScoreBreakdown = this.computeTelicScore(current);
     
-    // Task 2: Make step 0 explicit as initialization
+    // Make step 0 explicit as initialization
     const history: SimulationStep[] = [{
       sequence: [...current],
       rawDuality: initialRawD,
@@ -562,12 +566,12 @@ export class Telos {
       diagnostics: { proposals: [], bridges: [], invariants: [] }
     }];
 
-    let observerEmerged = false;
-    let observerStep: number | undefined;
+    let highDualityPersistence = false;
+    let highDualityStep: number | undefined;
     let persistenceCounter = 0;
-    const observerPersistence = this.params.observerPersistence || 1;
+    const highDualityPersistenceSteps = this.params.highDualityPersistenceSteps || 1;
 
-    // Task 4: Add run-level proposal counters
+    // Add run-level proposal counters
     const proposalStats = {
       counts: {} as Record<string, { 
         proposed: number; 
@@ -597,7 +601,6 @@ export class Telos {
     };
 
     for (let t = 1; t <= steps; t++) {
-      const dHist = history.map(h => h.duality);
       const currentTemp = this.params.temperature * Math.pow(0.95, t);
       const prevStep = history[history.length - 1];
       const prevSmoothedDuality = prevStep.duality;
@@ -616,7 +619,7 @@ export class Telos {
         selectionMetadata,
         diagnostics,
         metrics
-      } = this.evolveStep(current, t, dHist, currentTemp, prevSmoothedDuality, prevStep);
+      } = this.evolveStep(current, t, currentTemp, prevSmoothedDuality, prevStep);
       
       // Update stats
       if (proposalType !== 'none') {
@@ -664,13 +667,13 @@ export class Telos {
         ...metrics
       } as SimulationStep);
 
-      // Observer emergence check using compound structural trigger
-      if (!observerEmerged && t > 0) {
-        if (this.checkObserverEmergence(current, t, dNew, metrics, history)) {
+      // High duality persistence check using compound structural trigger
+      if (!highDualityPersistence && t > 0) {
+        if (this.checkHighDualityPersistence(current, dNew, metrics)) {
           persistenceCounter++;
-          if (persistenceCounter >= observerPersistence) {
-            observerEmerged = true;
-            observerStep = t;
+          if (persistenceCounter >= highDualityPersistenceSteps) {
+            highDualityPersistence = true;
+            highDualityStep = t;
           }
         } else {
           persistenceCounter = 0;
@@ -694,15 +697,15 @@ export class Telos {
       s.meanDeltaScore = s.accepted > 0 ? s.totalDelta / s.accepted : 0;
     });
 
-    // Task 5: Improve plateau semantics without changing scoring
+    // Improve plateau semantics without changing scoring
     const postMetrics = this.computePostRunMetrics(history);
     const bridgeSummary = this.computeBridgeSummary(history);
     const diagnostics = this.computeRunDiagnostics(history);
 
     return { 
       history, 
-      observerEmerged, 
-      observerStep,
+      highDualityPersistence, 
+      highDualityStep,
       iterationsRun: history.length - 1,
       proposalStats,
       bridgeSummary,

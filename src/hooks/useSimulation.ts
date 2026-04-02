@@ -12,7 +12,7 @@ export function useSimulation() {
   const [narrative, setNarrative] = useState<string[]>(["🌪️", "🐋", "🎯", "⚓", "💀"]);
   const [params, setParams] = useState<TelosParams>({
     alpha: 0.5, beta: 0.1, gamma: 0.3, delta: 0.2, lambda: 0.618,
-    eta: 0.3, epsilon: 0.05, threshold: 0.8, temperature: 1.0,
+    eta: 0.3, epsilon: 0.05, threshold: 0.8, highDualityPersistenceSteps: 2, temperature: 1.0,
     maxSequenceLength: 10, architectureMode: 'stratified', seed: Math.floor(Math.random() * 1000000)
   });
   const [autoRandomize, setAutoRandomize] = useState(false);
@@ -128,7 +128,7 @@ export function useSimulation() {
     const currentSeed = autoRandomize ? Math.floor(Math.random() * 1000000) : params.seed;
     const defaultParams: TelosParams = {
       alpha: 0.5, beta: 0.1, gamma: 0.3, delta: 0.2, lambda: 0.618,
-      eta: 0.3, epsilon: 0.05, threshold: 0.8, temperature: 1.0,
+      eta: 0.3, epsilon: 0.05, threshold: 0.8, highDualityPersistenceSteps: 2, temperature: 1.0,
       maxSequenceLength: 10, architectureMode: 'stratified', seed: currentSeed
     };
     
