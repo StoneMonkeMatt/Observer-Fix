@@ -1,5 +1,5 @@
 import { Codex } from './codex';
-import { SimulationResults, SimulationStep, BridgeEvent, BridgeSummary, BridgeFamilyStats, TelosParams } from '../types';
+import { SimulationResults, SimulationStep, BridgeEvent, BridgeSummary, BridgeFamilyStats, TelosParams, HighDualityPersistenceDiagnostic } from '../types';
 import { SeededRandom } from './random';
 import { isKernel, AgentContext } from './proposals/agents';
 import { buildProposalFrontier } from './proposals/frontier';
@@ -276,27 +276,47 @@ export class Telos {
     currentSeq: string[],
     dNew: number,
     metrics: Partial<SimulationStep>
-  ): boolean {
+  ): HighDualityPersistenceDiagnostic {
     // 1. Invariant Integrity: Reject if kernel purity drops below safety threshold (0.3)
-    if (metrics.invariantLeakageFlag) return false;
+    const invariantLeakagePassed = !metrics.invariantLeakageFlag;
 
     // 2. Symbolic Capacity: Require minimum sequence length for structural complexity
-    if (currentSeq.length < 8) return false;
+    const minLengthPassed = currentSeq.length >= 8;
 
     // 3. Telic Tension: Smoothed duality must exceed the parameter-defined threshold
-    if (dNew < this.params.threshold) return false;
+    const dualityThresholdPassed = dNew >= this.params.threshold;
 
     // 4. Bridge Richness: Require minimum cross-domain integration density (15%)
-    if (metrics.bridgeActivationRate !== undefined && metrics.bridgeActivationRate < 0.15) return false;
+    const bridgeActivationPassed = metrics.bridgeActivationRate !== undefined && metrics.bridgeActivationRate >= 0.15;
 
     // 5. Structural Alignment: Require high consensus score (telic quality proxy)
-    if (metrics.consensusScore !== undefined && metrics.consensusScore < 50) return false;
+    const consensusPassed = metrics.consensusScore !== undefined && metrics.consensusScore >= 50;
 
     // 6. Symbolic Presence: Require presence of at least two observer-class symbols (👁️/🧠)
-    const observerSymbols = currentSeq.filter(s => s === '👁️' || s === '🧠').length;
-    if (observerSymbols < 2) return false;
+    const observerSymbolCount = currentSeq.filter(s => s === '👁️' || s === '🧠').length;
+    const observerSymbolsPassed = observerSymbolCount >= 2;
 
-    return true;
+    const passed = invariantLeakagePassed && 
+                   minLengthPassed && 
+                   dualityThresholdPassed && 
+                   bridgeActivationPassed && 
+                   consensusPassed && 
+                   observerSymbolsPassed;
+
+    return {
+      invariantLeakagePassed,
+      minLengthPassed,
+      dualityThresholdPassed,
+      bridgeActivationPassed,
+      consensusPassed,
+      observerSymbolsPassed,
+      currentSequenceLength: currentSeq.length,
+      currentDuality: dNew,
+      currentBridgeActivationRate: metrics.bridgeActivationRate || 0,
+      currentConsensusScore: metrics.consensusScore || 0,
+      observerSymbolCount,
+      passed
+    };
   }
 
   private getBridgeEvents(
@@ -458,9 +478,23 @@ export class Telos {
       }
     }
 
+    const metrics: Partial<SimulationStep> = {
+      kernelPurity,
+      bridgeActivationRate,
+      bridgeEvents,
+      telicScoreTrend,
+      kernelDivergence,
+      convergenceIndex,
+      invariantLeakageFlag,
+      consensusScore,
+      fracturePoints
+    };
+
+    const highDualityPersistenceDiag = this.checkHighDualityPersistence(nextSeq, dNew, metrics);
+
     // [PHASE 3: DIAGNOSTICS]
     // We capture a diagnostic entry for the selected proposal.
-    const diagnostics = {
+    const diagnostics: SimulationStep['diagnostics'] = {
       proposals: [
         {
           ...createProposalDiagnostic(step, proposal, accepted),
@@ -483,6 +517,7 @@ export class Telos {
           0.3
         )
       ],
+      highDualityPersistence: highDualityPersistenceDiag,
       summary: {
         frontier: summarizeFrontier(frontier),
         topCandidates: getTopCandidates(ranked, 3).map(c => ({
@@ -508,17 +543,7 @@ export class Telos {
       scoreBreakdown,
       selectionMetadata,
       diagnostics,
-      metrics: {
-        kernelPurity,
-        bridgeActivationRate,
-        bridgeEvents,
-        telicScoreTrend,
-        kernelDivergence,
-        convergenceIndex,
-        invariantLeakageFlag,
-        consensusScore,
-        fracturePoints
-      }
+      metrics
     };
 }
 
@@ -531,6 +556,20 @@ export class Telos {
     const initialScoreBreakdown = this.computeTelicScore(current);
     
     // Make step 0 explicit as initialization
+    const initialMetrics: Partial<SimulationStep> = {
+      kernelPurity: this.computeKernelPurity(current),
+      bridgeActivationRate: this.computeBridgeActivation(current),
+      telicScoreTrend: 0,
+      kernelDivergence: 1.0 - this.computeKernelPurity(current),
+      convergenceIndex: 0,
+      invariantLeakageFlag: false,
+      consensusScore: initialScoreBreakdown.total,
+      fracturePoints: [],
+      bridgeEvents: this.getBridgeEvents(current, 'System', 'init', 0, 0, 0, true)
+    };
+
+    const initialHighDualityDiag = this.checkHighDualityPersistence(current, initialRawD, initialMetrics);
+
     const history: SimulationStep[] = [{
       sequence: [...current],
       rawDuality: initialRawD,
@@ -553,18 +592,15 @@ export class Telos {
       deltaScore: 0,
       inventoryChanged: false,
       orderChanged: false,
-      kernelPurity: this.computeKernelPurity(current),
-      bridgeActivationRate: this.computeBridgeActivation(current),
-      telicScoreTrend: 0,
-      kernelDivergence: 1.0 - this.computeKernelPurity(current),
-      convergenceIndex: 0,
-      invariantLeakageFlag: false,
-      consensusScore: initialScoreBreakdown.total,
-      fracturePoints: [],
-      bridgeEvents: this.getBridgeEvents(current, 'System', 'init', 0, 0, 0, true),
+      ...initialMetrics,
       selectionMetadata: { tieBreakApplied: false },
-      diagnostics: { proposals: [], bridges: [], invariants: [] }
-    }];
+      diagnostics: { 
+        proposals: [], 
+        bridges: [], 
+        invariants: [],
+        highDualityPersistence: initialHighDualityDiag
+      }
+    } as SimulationStep];
 
     let highDualityPersistence = false;
     let highDualityStep: number | undefined;
@@ -669,7 +705,7 @@ export class Telos {
 
       // High duality persistence check using compound structural trigger
       if (!highDualityPersistence && t > 0) {
-        if (this.checkHighDualityPersistence(current, dNew, metrics)) {
+        if (diagnostics.highDualityPersistence?.passed) {
           persistenceCounter++;
           if (persistenceCounter >= highDualityPersistenceSteps) {
             highDualityPersistence = true;

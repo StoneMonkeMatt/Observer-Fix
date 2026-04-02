@@ -128,6 +128,7 @@ export interface SimulationStep {
     proposals?: ProposalDiagnostic[];
     bridges?: BridgeDiagnostic[];
     invariants?: InvariantDiagnostic[];
+    highDualityPersistence?: HighDualityPersistenceDiagnostic;
     summary?: {
       frontier?: any;
       topCandidates?: any[];
@@ -135,6 +136,21 @@ export interface SimulationStep {
       kernelPreservation?: any;
     };
   };
+}
+
+export interface HighDualityPersistenceDiagnostic {
+  invariantLeakagePassed: boolean;
+  minLengthPassed: boolean;
+  dualityThresholdPassed: boolean;
+  bridgeActivationPassed: boolean;
+  consensusPassed: boolean;
+  observerSymbolsPassed: boolean;
+  currentSequenceLength: number;
+  currentDuality: number;
+  currentBridgeActivationRate: number;
+  currentConsensusScore: number;
+  observerSymbolCount: number;
+  passed: boolean;
 }
 
 export interface ProposalStats {
