@@ -132,6 +132,33 @@ export function ParameterPanel({
             );
           }
 
+          if (key === 'highDualityPersistenceSteps') {
+            return (
+              <div key={key} className="space-y-2 group relative">
+                <div className="flex justify-between text-[10px] font-mono uppercase tracking-wider">
+                  <span className="opacity-40 flex items-center gap-1">
+                    {label}
+                    {tooltip && <Info className="w-2.5 h-2.5 opacity-40" title={tooltip} />}
+                  </span>
+                  <span className="text-cyan-400 font-bold">{value}</span>
+                </div>
+                <input
+                  type="number"
+                  step="1"
+                  min="1"
+                  value={params.highDualityPersistenceSteps}
+                  onChange={(e) => {
+                    let val = parseInt(e.target.value, 10);
+                    if (isNaN(val)) val = 1;
+                    val = Math.max(1, val);
+                    setParams({ ...params, highDualityPersistenceSteps: val });
+                  }}
+                  className="w-full bg-white/5 border border-white/10 rounded px-2 py-1 text-[10px] font-mono text-cyan-400 focus:outline-none focus:border-cyan-500/50"
+                />
+              </div>
+            );
+          }
+
           return (
             <div key={key} className="space-y-2 group relative">
               <div className="flex justify-between text-[10px] font-mono uppercase tracking-wider">

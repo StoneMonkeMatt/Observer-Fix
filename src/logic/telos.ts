@@ -605,7 +605,7 @@ export class Telos {
     let highDualityPersistence = false;
     let highDualityStep: number | undefined;
     let persistenceCounter = 0;
-    const highDualityPersistenceSteps = this.params.highDualityPersistenceSteps || 1;
+    const highDualityPersistenceSteps = Math.max(1, Math.floor(this.params.highDualityPersistenceSteps || 1));
 
     // Add run-level proposal counters
     const proposalStats = {
